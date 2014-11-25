@@ -1,0 +1,39 @@
+.ob-collection {
+	position: relative;
+	margin: 20px 0;
+	padding: 20px;
+	border: solid 1px #c00;
+	border-radius: 10px;
+}
+.ob-collection .ob-collection {
+	padding-left: 20px;
+}
+.ob-fieldset, .ob-collection-fieldset {
+	position: relative;
+	margin: 20px 0;
+	padding: 20px;
+	border: solid 1px #ccc;
+	border-radius: 10px;
+}
+.ob-collection-fieldset {
+	cursor: move;
+}
+.ob-collection-fieldset .remove {
+	position: absolute;
+	bottom: 5px;
+	right: 10px;
+}
+.ob-collection.dragging > .fields > .ob-collection-fieldset.over {
+	background: #eee;
+}
+.ob-collection.dragging > .fields > .ob-collection-fieldset:after {
+	position: absolute;
+	display: block;
+	content: '';
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background: #fff;
+	opacity: .5;
+}
