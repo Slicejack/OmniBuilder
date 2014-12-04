@@ -16,3 +16,7 @@ Follow the [Getting Started](https://github.com/Slicejack/OmniBuilder/wiki/Getti
 ## Contribute
 
 Contributions to OmniBuilder are welcome. Please use the [issue tracker](https://github.com/Slicejack/OmniBuilder/issues) for bug/issue reporting.
+
+## License
+
+All contents of this package are licensed under the [MIT license](https://github.com/Slicejack/OmniBuilder/blob/master/LICENSE).
