@@ -136,9 +136,17 @@ abstract class Custom_Field extends Custom_Form_Element {
 	 */
 	public function set_json_data() {
 		parent::set_json_data();
+
 		$this->json_data['type'] = $this->type;
+
 		if ( ! empty( $this->options['label'] ) )
 			$this->json_data['label'] = $this->options['label'];
+
+		if ( ! empty( $this->options['description'] ) )
+			$this->json_data['description'] = $this->options['description'];
+
+		if ( ! empty( $this->options['default_value'] ) )
+			$this->json_data['default_value'] = $this->options['default_value'];
 
 		return $this;
 	}

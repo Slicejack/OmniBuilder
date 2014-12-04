@@ -18,27 +18,28 @@ window.wp = window.wp || {};
 	var api = exports.OB || {};
 
 	/**
-	 * Checkbox Field model
-	 * @class Field_Checkbox
+	 * Radio Field model
+	 * @class Field_Radio
 	 * @extends {Field}
 	 */
-	api.Field_Checkbox = api.Field.extend( {
+	api.Field_Radio = api.Field.extend( {
 		/**
 		 * Default options
-		 * @memberOf Field_Checkbox
+		 * @memberOf Field_Radio
 		 * @type {Object}
 		 * @extends {Field.prototype.defaults}
 		 */
 		defaults: _.extend( {}, api.Field.prototype.defaults, {
-			'type': 'checkbox'
+			'type': 'radio',
+			'choices': {}
 		} ),
 	} );
 
 	/**
-	 * Add Checkbox Field to OmniBuilder
+	 * Add Radio Field to OmniBuilder
 	 */
-	api.add( 'checkbox', {
-		model: api.Field_Checkbox,
+	api.add( 'radio', {
+		model: api.Field_Radio,
 		view: api.Field_View
 	} );
 

@@ -15,6 +15,8 @@ include 'Field/Fieldset.php';
 include 'Field/Text.php';
 include 'Field/Textarea.php';
 include 'Field/Checkbox.php';
+include 'Field/Radio.php';
+include 'Field/Select.php';
 
 function load_custom_wp_admin_style() {
 	wp_enqueue_style( 'ob', OMNI_BUILDER_URI . '/Resources/css/ob.css', array(), '0.1', 'all' );
