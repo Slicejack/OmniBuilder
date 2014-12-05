@@ -3,11 +3,6 @@
 namespace OmniBuilder;
 
 class Custom_Post_Type {
-	
-	/**
-	 * @var \Inflector
-	 */
-	private $inflector;
 
 	/**
 	 * @var string
@@ -38,12 +33,12 @@ class Custom_Post_Type {
 	 * @param string $name
 	 */
 	public function __construct( $name, array $fields = array(), array $args = array(), $public = true ) {
-		$this->inflector = new \Inflector();
-		$this->name = $name;
-		$this->singular = $this->inflector->titleize($name);
-		$this->plural = $this->inflector->pluralize($this->singular);
+		$this->name = \Inflector::underscore( \Inflector::singularize($name) );
+		$this->singular = \Inflector::titleize($name);
+		$this->plural = \Inflector::pluralize($this->singular);
 		$this->json_data = array();
 		$this->screen = null;
+		$this->args = $args;
 		
 		foreach ( $fields as $field ) {
 			if ( $field instanceof Custom_Meta_Box ) {
@@ -52,11 +47,12 @@ class Custom_Post_Type {
 			}
 		}
 
-		add_action( 'admin_enqueue_scripts', array( &$this, 'localize' ) );
+		if ( ! isset( $this->args['public'] ) ) {
+			$this->args['public'] = $public;
+		}
 
-		$args['public'] = $public;
-		if ( ! isset ( $args['labels'] ) ) {
-			$args['labels'] = array(
+		if ( ! isset( $this->args['labels'] ) ) {
+			$this->args['labels'] = array(
 				'name'                 => __( $this->singular ),
 				'singular_name'        => __( $this->singular ),
 				'menu_name'            => __( $this->plural ),
@@ -73,7 +69,7 @@ class Custom_Post_Type {
 			);
 		}
 
-		register_post_type( $name, $args );
+		$this->subscribe();
 	}
 
 	/**
@@ -87,7 +83,6 @@ class Custom_Post_Type {
 
 		return $this;
 	}
-
 	/**
 	 * @return string
 	 */
@@ -132,6 +127,21 @@ class Custom_Post_Type {
 		}
 
 		return $this->show_on_current_screen = false;
+	}
+
+	/**
+	 * @return void
+	 */
+	public function register_post_type() {
+		register_post_type( $this->name, $this->args );
+	}
+
+	/**
+	 * @return void
+	 */
+	protected function subscribe() {
+		add_action( 'init', array( &$this, 'register_post_type' ) );
+		add_action( 'admin_enqueue_scripts', array( &$this, 'localize' ) );
 	}
 
 }
