@@ -73,6 +73,17 @@ class Custom_Post_Type {
 	}
 
 	/**
+	 * @param string $name
+	 * @param array $args
+	 * @return $this
+	 */
+	public function add_taxonomy( $name, array $args = array() ) {
+		new Custom_Taxonomy( $name, $this );
+
+		return $this;
+	}
+
+	/**
 	 * @param string $id
 	 * @param string $title
 	 * @param array $fields
@@ -83,6 +94,7 @@ class Custom_Post_Type {
 
 		return $this;
 	}
+
 	/**
 	 * @return string
 	 */
