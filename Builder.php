@@ -9,6 +9,7 @@ include 'Custom_Form_Element.php';
 include 'Custom_Field.php';
 include 'Custom_Post_Type.php';
 include 'Custom_Meta_Box.php';
+include 'Custom_Taxonomy.php';
 
 include 'Field/Collection.php';
 include 'Field/Fieldset.php';
