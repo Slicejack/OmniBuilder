@@ -1,6 +1,6 @@
 ## What is OmniBuilder?
 
-OmniBuilder is a open source WordPress library for easy Custom Post Type and Meta Box registration. Using it’s object oriented structure, OmniBuilder enables you to register and manage new post types, meta boxes and fields more easily and efficiently.
+OmniBuilder is a open source WordPress library that makes Custom Post Type, Custom Taxonomy and Meta Box registration feel more natural.
 
 OmniBuilder is currently in the development stage so keep in mind that the OmniBuilder structure can be changed until it reaches the first stable version.
 
