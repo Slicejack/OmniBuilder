@@ -19,6 +19,8 @@ Follow the [Getting Started](https://github.com/Slicejack/OmniBuilder/wiki/Getti
 * Official contribution guide is currently under development and will be available soon but until then you should try to follow our and WordPress development standards as much as humanly possible.
 * Please use the official [issue tracker](https://github.com/Slicejack/OmniBuilder/issues) for bug/issue reporting.
 
+## [Change Log](https://github.com/Slicejack/OmniBuilder/blob/master/CHANGELOG.md)
+
 ## License
 
 All contents of this package are licensed under the [MIT license](https://github.com/Slicejack/OmniBuilder/blob/master/LICENSE).

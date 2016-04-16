@@ -34,6 +34,39 @@ window.ob = window.ob || {};
 	 */
 	var api = {};
 
+	api.toRender = [];
+	api.callbacks = [];
+
+	var renderIterationIndex = 0;
+	var renderIterationLength = 0;
+	api.renderIterationMaxLength = 50;
+	api.toRenderLength = function() {
+		var length = api.toRender.length;
+		return length < api.renderIterationMaxLength ? length : api.renderIterationMaxLength;
+	};
+
+	api.renderTick = function() {
+		if ( 0 === ( renderIterationLength = api.toRenderLength() ) ) {
+			window.requestAnimationFrame( api.renderTick );
+			return;
+		}
+		for ( renderIterationIndex = 0, renderIterationLength = api.toRenderLength(); renderIterationIndex < renderIterationLength; renderIterationIndex += 1 ) {
+			api.toRender[renderIterationIndex].call();
+			api.toRender[renderIterationIndex] = null;
+		}
+
+		api.toRender = _.filter( api.toRender, function( func ) { return null !== func; } );
+
+		window.requestAnimationFrame( api.renderTick );
+		return;
+	};
+
+	api.render = function( func ) {
+		if ( 'function' === typeof func ) {
+			api.toRender.push( func );
+		}
+	};
+
 	/**
 	 * Create Fields from given data
 	 * @private
@@ -266,7 +299,7 @@ window.ob = window.ob || {};
 		 * @private
 		 * @memberOf postForm_View
 		 */
-		submit: function() {
+		submit: function( event ) {
 			this.trigger( 'generate_names' );
 		}
 	} );
@@ -274,9 +307,11 @@ window.ob = window.ob || {};
 	$( document ).ready( function() {
 		api.postForm = new api.postForm_View();
 
-		if ( data )
-			new api.OmniBuilder( _.extend( {}, data ) );
+		if ( data ) {
+			window.ob_test = new api.OmniBuilder( _.extend( {}, data ) );
+		}
 
+		window.requestAnimationFrame( api.renderTick );
 	} );
 
 	/**

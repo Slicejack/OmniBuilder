@@ -70,21 +70,34 @@ window.wp = window.wp || {};
 		 */
 		add: function( models, options ) {
 			if ( this.field.get( 'limit' ) >= 0 ) {
-				if ( this.size() >= this.field.get( 'limit' ) )
+				if ( this.size() >= this.field.get( 'limit' ) ) {
 					return false;
+				}
 			}
 
       if ( options && options.move == true )
       	return Backbone.Collection.prototype.add.apply( this, [ models, options ] );
 
+      var model_type = this.field.get( 'model-type' );
+
 			var data = {
 				id: this.size(),
-				fields: this.field.get( 'fields' ),
+				fields: ( model_type == 'collection-block' ? this.field.get( 'fields' )[ this.field.get( 'blocks' )[ models.block ].index ].fields : this.field.get( 'fields' ) ),
 				parent: this.field,
-				type: 'collection-fieldset'
+				type: model_type
 			};
+			if ( model_type == 'collection-block' )
+				_.reject( models, function( value, key ) {
+					return key == 'block';
+				} );
+
 			options = models;
-			models = new api.Collection_Fieldset( data );
+
+			if ( model_type == 'collection-block' ) {
+				models = new api.Collection_Block( data );
+			}
+			else
+				models = new api.Collection_Fieldset( data );
 
 			return this.set( models, _.extend( { merge: false }, options, { add: true, remove: false } ) );
 		},
@@ -94,10 +107,10 @@ window.wp = window.wp || {};
 		 * @return {Collection_Setting} `this`
 		 */
 		reIndex: function() {
-			var self = this;
 			this.forEach( function( model ) {
-				model.set( 'id', self.indexOf( model ) );
-			} );
+				if ( model.get( 'id' ) !== this.indexOf( model ) )
+					model.set( 'id', this.indexOf( model ) );
+			}.bind( this ) );
 
 			return this;
 		},
@@ -130,6 +143,9 @@ window.wp = window.wp || {};
 			'fields': '',
 			'limit': -1,
 			'dragging': false,
+			'blocks': {},
+			'button': 'Add',
+			'model-type': 'collection-fieldset',
 			'type': 'collection'
 		} ),
 		/**
@@ -137,6 +153,33 @@ window.wp = window.wp || {};
 		 * @memberOf Collection
 		 */
 		initialize: function() {
+			var fields = this.get( 'fields' );
+			if ( _.size( fields ) > 0 ) {
+				var _blocks = _.filter( fields, function( field ) {
+					return field.type == 'collection-block';
+				} );
+
+				if ( _.size( _blocks ) > 0 ) {
+					var blocks = {};
+					_.each( _blocks, function( field, index ) {
+						if ( field.type == 'collection-block' ) {
+							blocks[ field.id ] = {
+								index: index,
+								label: field.label
+							};
+						}
+					} );
+
+					this.set( 'fields', _blocks );
+					this.set( 'blocks', blocks );
+
+					if ( this.get( 'button' ) === this.defaults['button'] ) {
+						this.set( 'button', 'Choose' );
+					}
+
+					this.set( 'model-type', 'collection-block' );
+				}
+			}
 			this.set( 'setting', new api.Collection_Setting( { field: this } ) );
 		},
 		/**
@@ -145,8 +188,12 @@ window.wp = window.wp || {};
 		 */
 		set_settings: function( data ) {
 			var data = _.isArray( data ) ? data : [];
-			for ( var i = 0; i < data.length; i++ )
-				this.get( 'setting' ).add( { silent: true } ).set_settings( data[i] );
+			for ( var i = 0; i < data.length; i++ ) {
+				if ( _.size( this.get( 'blocks' ) ) > 0 && data[i].type )
+					this.get( 'setting' ).add( { block: data[i].type, silent: true } ).set_settings( data[i] );
+				else
+					this.get( 'setting' ).add( { silent: true } ).set_settings( data[i] );
+			}
 
 			return this;
 		},
@@ -189,7 +236,7 @@ window.wp = window.wp || {};
 				setting.remove( model, { silent: true } );
 				setting.add( model, { at: index, silent: true, move: true } );
 				setting.trigger( 'reindex' );
-				this.trigger( 'rerender' );
+				model.trigger( 'move', index );
 			}
 		},
 		/**
@@ -209,6 +256,13 @@ window.wp = window.wp || {};
 				this.trigger( 'addEmptyField' );
 
 			return this;
+		},
+		/**
+		 * Size of collection
+		 * @return {Number}
+		 */
+		size: function() {
+			return this.get( 'setting' ).size();
 		}
 	} );
 
@@ -222,7 +276,7 @@ window.wp = window.wp || {};
 		 * @memberOf Collection_View
 		 * @inheritDoc
 		 */
-		className: 'ob-collection',
+		className: 'ob-field ob-collection',
 		/**
 		 * @memberOf Collection_View
 		 * @inheritDoc
@@ -234,7 +288,9 @@ window.wp = window.wp || {};
 		 * @type {Object}
 		 */
 		events: {
-			'click >.add': 'add'
+			'click div:not(.ob-field) .add': 'add',
+			'click div:not(.ob-field) .choose': 'toggleBlocks',
+			'click div:not(.ob-field) .choose .blocks [data-block]': 'addBlock'
 		},
 		/**
 		 * @memberOf Collection_View
@@ -244,8 +300,20 @@ window.wp = window.wp || {};
 			api.Field_View.prototype.initialize.apply( this );
 
 			this.listenTo( this.model, 'change:dragging', this.dragging );
-			this.listenTo( this.model, 'rerender', this.rerender );
 			this.listenTo( this.model, 'addEmptyField', this.addEmptyField );
+			this.listenTo( this.model.get( 'setting' ), 'remove', this.checkErrors );
+			this.listenTo( this.model.get( 'setting' ), 'add remove reset', this.updateSize );
+			this.on( 'render', this.updateSize );
+		},
+		/**
+		 * @memberOf Collection_View
+		 * @inheritDoc
+		 */
+		parseData: function( data ) {
+			if ( _.size( data.blocks ) < 1 )
+				data.blocks = null;
+
+			return data;
 		},
 		/**
 		 * Add new Collection Fieldset
@@ -256,29 +324,129 @@ window.wp = window.wp || {};
 			var added = this.model.get( 'setting' ).add();
 
 			if ( added == false ) {
-				console.warn( 'Limit is exceeded! ' );
+				console.warn( 'Limit is exceeded!' );
+				this.showError( 'limit' );
 
 				return this;
 			}
 
-			if ( _.isArray( added ) )
+			if ( _.isArray( added ) ) {
 				added = _.first( added );
+			}
 
-			if ( added instanceof api.Collection_Fieldset )
+			if ( added instanceof api.Collection_Fieldset ) {
 				added.trigger( 'focus' );
+			}
+
+			return this;
+		},
+		toggleBlocks: function( event ) {
+			if ( event ) {
+				var $blocks;
+				if ( $( event.target ).closest( '.ob-field__footer__actions' ).length ) {
+					$blocks = $( 'div:not(.ob-field) .ob-field__footer__actions .choose .blocks', this.$el );
+				} else {
+					$blocks = $( 'div:not(.ob-field) .ob-field__header__actions .choose .blocks', this.$el );
+				}
+
+				if ( 'block' === $blocks.css( 'display' ) ) {
+					$blocks.css( 'display', 'none' );
+				} else {
+					$blocks.css( 'display', 'block' );
+				}
+			} else {
+				var $blocks = $( 'div:not(.ob-field) .choose .blocks', this.$el );
+				var is_showed = false;
+				$blocks.each( function() {
+					if ( 'block' === this.css( 'display' ) ) {
+						is_showed = true;
+					}
+				} );
+
+				if ( is_showed ) {
+					this.hideBlocks();
+				} else {
+					this.showBlocks();
+				}
+			}
+
+			return this;
+		},
+		showBlocks: function( event ) {
+			if ( event ) {
+				if ( $( event.target ).closest( '.ob-field__footer__actions' ).length ) {
+					$( 'div:not(.ob-field) .ob-field__footer__actions .choose .blocks', this.$el ).css( 'display', 'block' );
+				} else {
+					$( 'div:not(.ob-field) .ob-field__header__actions .choose .blocks', this.$el ).css( 'display', 'block' );
+				}
+			} else {
+				$( 'div:not(.ob-field) .choose .blocks', this.$el ).css( 'display', 'block' );
+			}
+		},
+		hideBlocks: function( event ) {
+			if ( event ) {
+				event.stopPropagation();
+			}
+			$( 'div:not(.ob-field) .choose .blocks', this.$el ).css( 'display', 'none' );
+		},
+		addBlock: function( event ) {
+			event.stopPropagation();
+			var added = this.model.get( 'setting' ).add( { block: $( event.target ).data( 'block' ) } );
+
+			this.hideBlocks();
+
+			if ( added == false ) {
+				console.warn( 'Limit is exceeded!' );
+				this.showError( 'limit' );
+
+				return this;
+			}
+
+			if ( _.isArray( added ) ) {
+				added = _.first( added );
+			}
+
+			if ( added instanceof api.Collection_Block ) {
+				added.trigger( 'focus' );
+			}
 
 			return this;
 		},
 		/**
-		 * Detach all Collection Fieldsets from DOM and render them again
-		 * @memberOf Collection_View
+		 * Update collection size info
 		 * @return {Collection_View} `this`
 		 */
-		rerender: function() {
-			$( '>div', this.getFieldsEl() ).detach();
-			this.trigger( 'render' );
+		updateSize: function() {
+			var limit = this.model.get( 'limit' );
+
+			if ( ! _.isFinite( limit ) || limit < 0 ) return this;
+
+			var size = this.model.size();
+
+			$( '> .numbers', this.$el ).css( 'display', 'block' );
+			$( '> .numbers .size', this.$el ).text( size );
+			$( '> .numbers .limit', this.$el ).text( limit );
 
 			return this;
+		},
+		showError: function( error ) {
+			$( '> .messages .error-' + error, this.$el ).css( 'display', 'block' );
+
+			return this;
+		},
+		hideError: function( error ) {
+			$( '> .messages .error-' + error, this.$el ).css( 'display', 'none' );
+
+			return this;
+		},
+		checkErrors: function() {
+			var limit = this.model.get( 'limit' );
+			if ( _.isFinite( limit ) && limit >= 0 ) {
+				var size = this.model.size();
+
+				if ( size <= limit )
+					this.hideError( 'limit' );
+			}
 		},
 		/**
 		 * Remove or add dragging class
@@ -318,7 +486,8 @@ window.wp = window.wp || {};
 		 */
 		defaults: _.extend( {}, api.Field.prototype.defaults, {
 			'fields': {},
-			'type': 'collection-fieldset'
+			'type': 'collection-fieldset',
+			'dragAllowed': false
 		} ),
 		/**
 		 * Initialize Collection Fieldset model
@@ -326,6 +495,8 @@ window.wp = window.wp || {};
 		 */
 		initialize: function() {
 			this.add_fields( this.get( 'fields' ) );
+			this.on( 'move', this.move );
+			this.on( 'focus', this.focus );
 		},
 		/**
 		 * Add fields to Collection Fieldset
@@ -358,6 +529,18 @@ window.wp = window.wp || {};
 				var field = this.get_field( key )
 				if ( field != false )
 					field.set_settings( data[key] );
+			}
+
+			return this;
+		},
+		/**
+		 * Collect values of child fields
+		 * @memberOf Collection_Fieldset
+		 */
+		collect_values: function() {
+			var fields = this.get( 'fields' );
+			for ( key in fields ) {
+				fields[key].collect_values();
 			}
 
 			return this;
@@ -415,6 +598,25 @@ window.wp = window.wp || {};
 				fields[key].generate_names();
 
 			return true;
+		},
+		move: function( index ) {
+			if ( ( this.collection.size() - 1 ) == index )
+				this.view.moveToEnd();
+			else
+				this.view.moveBefore( this.collection.get( index + 1 ).view.$el );
+
+			return this;
+		},
+		focus: function() {
+			var fields = this.get( 'fields' );
+			for ( key in fields ) {
+				if ( true === fields[key].get( 'can_be_focused' ) ) {
+					fields[key].trigger( 'focus' );
+					break;
+				}
+			}
+
+			return this;
 		}
 	} );
 
@@ -428,7 +630,7 @@ window.wp = window.wp || {};
 		 * @memberOf Collection_Fieldset_View
 		 * @inheritDoc
 		 */
-		className: 'ob-collection-fieldset',
+		className: 'ob-field ob-collection-fieldset',
 		/**
 		 * DOM Element attributes
 		 * @memberOf Collection_Fieldset_View
@@ -449,7 +651,9 @@ window.wp = window.wp || {};
 			'dragend': 'dragend',
 			'dragover': 'dragover',
 			'drop': 'drop',
-			'click >.remove': 'remove'
+			'mouseenter div:not(.ob-field) .drag-handler': 'allowDrag',
+			'mouseleave div:not(.ob-field) .drag-handler': 'disallowDrag',
+			'click div:not(.ob-field) .remove': 'remove'
 		},
 		/**
 		 * @memberOf Collection_Fieldset_View
@@ -462,7 +666,28 @@ window.wp = window.wp || {};
 		initialize: function() {
 			api.Field_View.prototype.initialize.apply( this );
 
-			this.listenTo( this.model, 'focus', this.focus );
+			this.listenTo( this.model, 'change:id', this.updateId );
+		},
+		/**
+		 * Replace old id with new id
+		 * @memberOf Field_View
+		 * @param  {Object} model   This model
+		 * @param  {String} value   New value
+		 * @param  {Object} options
+		 */
+		updateId: function( model, value, options ) {
+			var id = parseInt( value ) + 1;
+			$( 'div:not(.ob-field) .drag-handler .id', this.$el ).text( id );
+		},
+		allowDrag: function() {
+			this.model.set( 'dragAllowed', true );
+
+			return this;
+		},
+		disallowDrag: function() {
+			this.model.set( 'dragAllowed', false );
+
+			return this;
 		},
 		/**
 		 * on dragstart event
@@ -470,10 +695,18 @@ window.wp = window.wp || {};
 		 * @param  {Event} event
 		 */
 		dragstart: function( event ) {
+			if ( this.model.get( 'dragAllowed' ) !== true ) {
+				event.preventDefault();
+				return false;
+			}
+
+			event.originalEvent.dataTransfer.setData( 'text/plain', 'anything' );
 			event.stopPropagation();
+
 			var model = this.model;
-			var setting = model.get( 'parent' ).get( 'setting' );
-			this.model.get( 'parent' ).set( 'dragging', setting.indexOf( model ) );
+			var parent = model.get( 'parent' );
+
+			parent.set( 'dragging', parent.get( 'setting' ).indexOf( model ) );
 		},
 		/**
 		 * on dragenter event
@@ -500,8 +733,8 @@ window.wp = window.wp || {};
 		 */
 		dragend: function( event ) {
 			event.stopPropagation();
-			var parent = this.model.get( 'parent' );
-			parent.set( 'dragging', false );
+
+			this.model.get( 'parent' ).set( 'dragging', false );
 		},
 		/**
 		 * on dragover event
@@ -517,6 +750,7 @@ window.wp = window.wp || {};
 		 * @param  {Event} event
 		 */
 		drop: function ( event ) {
+			event.preventDefault();
 			event.stopPropagation();
 			var parent = this.model.get( 'parent' );
 			var setting = parent.get( 'setting' );
@@ -536,12 +770,53 @@ window.wp = window.wp || {};
 
 			return this;
 		},
-		/**
-		 * Focus on first element
-		 */
-		focus: function() {
-			$( 'input, textarea, select', this.$el ).first().focus();
+		moveToEnd: function() {
+			this.model.trigger( 'before_move' );
+
+			this.$el.appendTo( this.model.get( 'parent' ).view.getFieldsEl() );
+
+			this.model.trigger( 'after_move' );
+
+			return this;
+		},
+		moveBefore: function( el ) {
+			this.model.trigger( 'before_move' );
+
+			this.$el.insertBefore( el );
+
+			this.model.trigger( 'after_move' );
+
+			return this;
 		}
+	} );
+
+	/**
+	 * Collection Block model
+	 * @class Collection_Block
+	 * @extends {Collection_Fieldset}
+	 */
+	api.Collection_Block = api.Collection_Fieldset.extend( {
+
+	} );
+
+	/**
+	 * Collection Block view
+	 * @class Collection_Block_View
+	 * @extends {Collection_Fieldset_View}
+	 */
+	api.Collection_Block_View = api.Collection_Fieldset_View.extend( {
+		/**
+		 * @memberOf Collection_Fieldset_View
+		 * @inheritDoc
+		 */
+		className: 'ob-field ob-collection-block',
+
+		/**
+		 * @memberOf Collection_Fieldset_View
+		 * @inheritDoc
+		 */
+		template: wp.template( 'ob-collection-block' )
+
 	} );
 
 	/**
@@ -555,6 +830,9 @@ window.wp = window.wp || {};
 		defaults: _.extend( api.Field.prototype.defaults, {
 			'collection_child': null
 		} ),
+		events: {
+			'initialize': 'is_collection_child'
+		},
 		/**
 		 * Returns true if Field is inside Collection
 		 * @memberOf Field
@@ -564,7 +842,7 @@ window.wp = window.wp || {};
 			var collection_child = this.get( 'collection_child' );
 			if ( collection_child === true || collection_child === false ) return collection_child;
 
-			if ( this.get( 'parent' ).get( 'collection_child' ) == true || this.get( 'parent' ) instanceof api.Collection ) {
+			if ( this.get( 'parent' ).get( 'collection_child' ) == true || this.get( 'parent' ) instanceof api.Collection || this.get( 'parent' ) instanceof api.Collection_Fieldset ) {
 				this.set( 'collection_child', true, { silent: true } );
 
 				return true;
@@ -619,6 +897,14 @@ window.wp = window.wp || {};
 	api.add( 'collection-fieldset', {
 		model: api.Collection_Fieldset,
 		view: api.Collection_Fieldset_View
+	} );
+
+	/**
+	 * Add Collection Block to OmniBuilder
+	 */
+	api.add( 'collection-block', {
+		model: api.Collection_Block,
+		view: api.Collection_Block_View
 	} );
 
 	/**

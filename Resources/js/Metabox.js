@@ -153,9 +153,11 @@ window.wp = window.wp || {};
 		 * @return {Metabox_View} `this`
 		 */
 		render: function() {
-			this.$el.html( this.template( { description: this.model.get( 'description' ) } ) );
-			this.model.set( 'rendered', true );
-			this.trigger( 'render' );
+			api.render( function() {
+				this.$el.html( this.template( { description: this.model.get( 'description' ) } ) );
+				this.model.set( 'rendered', true );
+				this.trigger( 'render' );
+			}.bind( this ) );
 
 			return this;
 		},

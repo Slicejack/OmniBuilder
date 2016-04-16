@@ -126,7 +126,7 @@ window.wp = window.wp || {};
 		 * @memberOf Fieldset_View
 		 * @inheritDoc
 		 */
-		className: 'ob-fieldset',
+		className: 'ob-field ob-fieldset',
 		/**
 		 * @memberOf Fieldset_View
 		 * @inheritDoc

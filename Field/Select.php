@@ -12,6 +12,11 @@ class Select extends Custom_Field {
 	public $type = 'select';
 
 	/**
+	 * @var array
+	 */
+	protected $allowed_attributes = array( 'disabled', 'multiple', 'size' );
+
+	/**
 	 * @{inheritDoc}
 	 */
 	public function set_json_data() {
@@ -25,15 +30,17 @@ class Select extends Custom_Field {
 	/**
 	 * @{inheritDoc}
 	 */
-	public function render() {
-		return '<script type="text/html" id="tmpl-ob-field-select">
+	public function render() { ?>
+		<script type="text/html" id="tmpl-ob-field-select">
 			<label for="{{ data.name }}">{{ data.label }}</label>
-			<select name="{{ data.name }}">
+			<div class="description">{{ data.description }}</div>
+			<select name="{{ data.name }}"{{ data.attributes }}>
 			<# for ( choice in data.choices ) { #>
 				<option value="{{ choice }}"<# if ( data.value && data.value == choice ) { #> selected="selected"<# } #>>{{ data.choices[choice] }}</option>
 			<# } #>
 			</select>
-		</script>';
+		</script>
+	<?php
 	}
 
 	/**

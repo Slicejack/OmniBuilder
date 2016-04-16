@@ -36,30 +36,30 @@ class Custom_Meta_Box extends Custom_Form_Element {
 	 * @return void
 	 */
 	public function set_meta_box() {
-		add_meta_box( $this->id, $this->title, array( &$this, 'populate_meta_box' ), $this->parent->get_name() );
+		if ( true === $this->parent->show_on_current_screen() ) {
+			add_meta_box( $this->id, $this->title, array( &$this, 'populate_meta_box' ), $this->parent->get_name(), 'normal' );
+		}
 	}
 
 	/**
 	 * @return void
 	 */
 	public function populate_meta_box() {
-		$output =  '';
-		$output .= '<div class="ob-metabox-wrapper"></div>';
-		$output .= '<div class="ob-metabox-templates">';
-		$output .= '<script type="text/html" id="tmpl-ob-metabox">';
-		$output .= '<div class="description">{{ data.description }}</div>';
-		$output .= '<div class="fields"></div>';
-		$output .= '</script>';
+		?>
+		<div class="ob-metabox-wrapper"></div>
+		<div class="ob-metabox-templates">
+			<script type="text/html" id="tmpl-ob-metabox">
+				<div class="fields"></div>
+			</script>
 
-		foreach ( $this->children as $child ) {
-			if ( $child instanceof Custom_Field ) {
-				$output .= $child->render();
-			}
-		}
+			<?php foreach ( $this->children as $child ) {
+				if ( $child instanceof Custom_Field ) {
+					$child->render();
+				}
+			} ?>
 
-		$output .= '</div>';
-
-		echo $output;
+		</div>
+		<?php
 	}
 
 	/**
@@ -85,7 +85,7 @@ class Custom_Meta_Box extends Custom_Form_Element {
 	public function save( $post_id, $fields ) {
 		foreach ( $fields as $field ) {
 			$value = $field->get_posted_value();
-			if ( $value != null ) {
+			if ( $field->is_posted() ) {
 				if ( is_array( $value ) && isset( $value['children'] ) ) {
 					$this->save( $post_id, $value['children'] );
 				} else {

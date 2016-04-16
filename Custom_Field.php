@@ -20,6 +20,11 @@ abstract class Custom_Field extends Custom_Form_Element {
 	public $type = 'default';
 
 	/**
+	 * @var array
+	 */
+	protected $allowed_attributes = array();
+
+	/**
 	 * @param string $id
 	 * @param array $options
 	 * @param array $children
@@ -30,7 +35,7 @@ abstract class Custom_Field extends Custom_Form_Element {
 		$this->children = array();
 		$this->name = null;
 		$this->value = null;
-		$this->options = $options;
+		$this->set_options( $options );
 
 		foreach ( $children as $child ) {
 			$this->children[ $child->get_id() ] = $child;
@@ -88,24 +93,30 @@ abstract class Custom_Field extends Custom_Form_Element {
 	 */
 	public function set_options( array $options ) {
 		$this->options = $options;
+		$this->validate_options();
 
 		return $this;
 	}
 
 	/**
-	 * @return string
+	 * Validate options
+	 * @return $this
 	 */
-	public function get_field_attributes() {
-		$attributes = ' ';
-		$attributes .= 'name="' . $this->get_name_attribute() . '" ';
-
-		if ( isset( $this->options['attributes'] ) ) {
-			foreach ( $this->options['attributes'] as $attribute => $value ) {
-				$attributes .= $attribute . '="' . $value . '" ';
+	private function validate_options() {
+		if ( ! is_array( $this->options ) )
+			$this->options = array();
+		elseif ( isset( $this->options['attributes'] ) ) {
+			if ( ! is_array( $this->options['attributes'] ) )
+				$this->options['attributes'] = array();
+			else {
+				foreach ( $this->options['attributes'] as $attribute => $value ) {
+					if ( ! in_array( strtolower( $attribute ), $this->allowed_attributes ) && substr( strtolower( $attribute ), 0, 5 ) != 'data-' ) continue;
+					$this->options['attributes'][$attribute] = esc_attr( $value );
+				}
 			}
 		}
 
-		return $attributes;
+		return $this;
 	}
 
 	/**
@@ -125,10 +136,17 @@ abstract class Custom_Field extends Custom_Form_Element {
 	}
 
 	/**
+	 * @return boolean
+	 */
+	public function is_posted() {
+		return ( isset( $_POST[ '_' . $this->get_name() ] ) ) ? true : false;
+	}
+
+	/**
 	 * @return string|null
 	 */
 	public function get_posted_value() {
-		return ( isset( $_POST[ '_' . $this->get_name() ] ) )? (string) $_POST[ '_' . $this->get_name() ] : null ;
+		return $this->is_posted() ? (string) $_POST[ '_' . $this->get_name() ] : null;
 	}
 
 	/**
@@ -139,14 +157,17 @@ abstract class Custom_Field extends Custom_Form_Element {
 
 		$this->json_data['type'] = $this->type;
 
-		if ( ! empty( $this->options['label'] ) )
+		if ( isset( $this->options['label'] ) && ! empty( $this->options['label'] ) )
 			$this->json_data['label'] = $this->options['label'];
 
-		if ( ! empty( $this->options['description'] ) )
+		if ( isset( $this->options['description'] ) && ! empty( $this->options['description'] ) )
 			$this->json_data['description'] = $this->options['description'];
 
-		if ( ! empty( $this->options['default_value'] ) )
+		if ( isset( $this->options['default_value'] ) && ! empty( $this->options['default_value'] ) )
 			$this->json_data['default_value'] = $this->options['default_value'];
+
+		if ( isset( $this->options['attributes'] ) && ! empty( $this->options['attributes'] ) )
+			$this->json_data['attributes'] = $this->options['attributes'];
 
 		return $this;
 	}

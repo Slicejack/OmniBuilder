@@ -12,6 +12,11 @@ class Radio extends Custom_Field {
 	public $type = 'radio';
 
 	/**
+	 * @var array
+	 */
+	protected $allowed_attributes = array( 'disabled' );
+
+	/**
 	 * @{inheritDoc}
 	 */
 	public function set_json_data() {
@@ -25,14 +30,18 @@ class Radio extends Custom_Field {
 	/**
 	 * @{inheritDoc}
 	 */
-	public function render() {
-		return '<script type="text/html" id="tmpl-ob-field-radio">
+	public function render() { ?>
+		<script type="text/html" id="tmpl-ob-field-radio">
 			<label for="{{ data.name }}">{{ data.label }}</label>
-			<# for ( choice in data.choices ) { #>
-			<input type="radio" name="{{ data.name }}" id="{{ data.name }}_{{ choice }}" value="{{ choice }}"<# if ( data.value && data.value == choice ) { #> checked="checked"<# } #> />
-			<label for="{{ data.name }}_{{ choice }}">{{ data.choices[choice] }}</label>
-			<# } #>
-		</script>';
+			<div class="description">{{ data.description }}</div>
+			<div class="ob-field__input">
+				<# for ( choice in data.choices ) { #>
+				<input type="radio" name="{{ data.name }}" id="{{ data.name }}_{{ choice }}" value="{{ choice }}"<# if ( data.value && data.value == choice ) { #> checked="checked"<# } #>{{ data.attributes }} />
+				<label for="{{ data.name }}_{{ choice }}">{{ data.choices[choice] }}</label>
+				<# } #>
+			</div>
+		</script>
+	<?php
 	}
 
 	/**

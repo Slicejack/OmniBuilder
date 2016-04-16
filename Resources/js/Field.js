@@ -67,7 +67,9 @@ window.wp = window.wp || {};
 			'name': '',
 			'description': '',
 			'default_value': '',
-			'rendered': false
+			'attributes': {},
+			'rendered': false,
+			'can_be_focused': true
 		},
 		/**
 		 * Initialize Field model
@@ -76,6 +78,7 @@ window.wp = window.wp || {};
 		initialize: function() {
 			this.set( 'name', this.cid );
 			this.set( 'setting', new api.Setting( { default_value: this.get( 'default_value' ), field: this } ) );
+			this.on( 'focus', this.focus );
 		},
 		/**
 		 * Set setting value
@@ -95,7 +98,7 @@ window.wp = window.wp || {};
 		 */
 		render: function() {
 			if ( ! this.view )
-				api.FieldViewConstructor( {model: this } );
+				api.FieldViewConstructor( { model: this } );
 
 			this.trigger( 'render' );
 
@@ -121,6 +124,22 @@ window.wp = window.wp || {};
 			this.set( 'name', name );
 
 			return this;
+		},
+		/**
+		 * Collect values
+		 * @memberOf Field
+		 * @return {Field} `this`
+		 */
+		collect_values: function() {
+			var value = this.view.get_value();
+			this.get( 'setting' ).set( 'value', value );
+		},
+		focus: function() {
+			if ( ! this.view ) {
+				this.once( 'render', this.focus );
+				return;
+			}
+			this.view.trigger( 'focus' );
 		}
 	} );
 
@@ -130,6 +149,7 @@ window.wp = window.wp || {};
 	 * @extends {Backbone.View}
 	 */
 	api.Field_View = Backbone.View.extend( {
+		appended: false,
 		/**
 		 * DOM Element class attribute
 		 * @memberOf Field_View
@@ -153,29 +173,74 @@ window.wp = window.wp || {};
 		initialize: function() {
 			this.listenTo( this.model, 'render', this.render );
 			this.listenTo( this.model, 'change:name', this.updateName );
+			this.on( 'appended', function() {
+				this.appended = true;
+			} );
+			this.on( 'focus', this.focus );
+
+			this.trigger( 'initialize' );
 		},
 		/**
 		 * Field render
 		 * @memberOf Field_View
 		 * @return {Field_View} `this`
 		 */
-		render: function() {
-			var data = {},
-				rendered = false;
+		attributesToString: function( data ) {
+			var attrs = data || {};
+
+			if ( _.size( attrs ) < 1 ) return '';
+
+			var attributes = '';
+			for ( attr in attrs ) {
+				attributes += ' ' + attr.toLowerCase() + '=' + attrs[ attr ] + '';
+			}
+
+			return attributes;
+		},
+		/**
+		 * Parse data
+		 * @param  {Object} data
+		 * @return {Object} data
+		 */
+		parseData: function( data ) {
+			return data;
+		},
+		getData: function() {
+			var data = {};
 			_.extend( data, this.model.attributes );
 			if ( this.model.has( 'setting' ) )
 				_.extend( data, this.model.get( 'setting' ).attributes );
 
-			if ( this.model.get( 'rendered' ) !== true ) {
-				this.$el.html( this.template( data ) );
-				this.model.set( 'rendered', true );
-				rendered = true;
+			data.attributes = this.attributesToString( data.attributes );
+
+			return this.parseData( data );
+		},
+		render: function() {
+			if ( ! this.appended ) {
+				var rendered = false;
+
+				if ( this.model.get( 'rendered' ) !== true ) {
+					var data = this.getData();
+
+					this.$el.html( this.template( data ) );
+					this.model.set( 'rendered', true );
+					rendered = true;
+				}
+
+				this.appendToParent();
+
+				if ( rendered ) {
+					this.trigger( 'render' );
+				}
+			} else {
+				api.render( function() {
+					var data = this.getData();
+
+					this.$el.html( this.template( data ) );
+					this.model.set( 'rendered', true );
+					this.trigger( 'render' );
+				}.bind( this) );
 			}
-
-			this.appendToParent();
-
-			if ( rendered )
-				this.trigger( 'render' );
 
 			return this;
 		},
@@ -187,10 +252,10 @@ window.wp = window.wp || {};
 		getFieldsEl: function() {
 			if ( this.$fields ) return this.$fields;
 
-			var fields = $( '>.fields', this.$el );
+			var fields = $( $( '.fields', this.$el )[0] );
 			if ( ! fields.length ) {
 				this.$el.append( '<div class="fields" />' );
-				fields = $( '>.fields', this.$el );
+				fields = $( $( '.fields', this.$el )[0] );
 			}
 
 			this.$fields = fields;
@@ -204,8 +269,23 @@ window.wp = window.wp || {};
 		 */
 		appendToParent: function() {
 			var parent = this.model.get( 'parent' );
-			if ( parent && parent.view.getFieldsEl().find( this.$el ).length < 1 )
+			if ( parent && parent.view && false === parent.view.appended && parent.view.getFieldsEl().find( this.$el ).length < 1 ) {
 				parent.view.getFieldsEl().append( this.$el );
+				this.listenTo( parent.view, 'appended', function() {
+					this.trigger( 'appended' );
+				} );
+			} else {
+				api.render( function() {
+					var parent = this.model.get( 'parent' );
+					if ( parent && parent.view.getFieldsEl().find( this.$el ).length < 1 ) {
+						parent.view.getFieldsEl().append( this.$el );
+
+						api.render( function() {
+							this.trigger( 'appended' );
+						}.bind( this ) );
+					}
+				}.bind( this ) );
+			}
 
 			return this;
 		},
@@ -218,9 +298,52 @@ window.wp = window.wp || {};
 		 */
 		updateName: function( model, value, options ) {
 			var prevValue = model.previous( 'name' );
-			$( '[name="' + prevValue + '"]', this.$el ).each( function() {
-				$( this ).attr( 'name', $( this ).attr( 'name' ).replace( prevValue, value ) );
+			$( '[name^="' + prevValue + '"]', this.$el ).each( function() {
+				var $self = $( this );
+				var name = $self.attr( 'name' );
+				var id = $self.attr( 'id' );
+
+				var new_attrs = {};
+
+				if ( name !== undefined && name.length )
+					new_attrs[ 'name' ] = name.replace( prevValue, value );
+
+				if ( id !== undefined && id.length )
+					new_attrs[ 'id' ] = id.replace( prevValue, value );
+
+				$self.attr( new_attrs );
 			} );
+		},
+		/**
+		 * Gets value of live DOM input element
+		 * @return {string|object|null} Returns null if there is not input elements, string if there is one input element and object if there is two or more input elements.
+		 */
+		get_value: function() {
+			var input_els = $( 'input, textarea, select', this.$el );
+
+			if ( input_els.length < 1 )
+				return null;
+
+			if ( input_els == 1 )
+				return input_els.val();
+
+			var value = {};
+			var el;
+			for ( var i = 0, l = input_els.length; i < l; i++ ) {
+				el = input_els.eq( i );
+				value[ el.attr( 'id' ) ] = el.val();
+			}
+
+			return value;
+		},
+		focus: function() {
+			if ( this.appended ) {
+				$( 'input, textarea, select', this.$el ).first().focus();
+			} else {
+				this.once( 'appended', function() {
+					$( 'input, textarea, select', this.$el ).first().focus();
+				} );
+			}
 		}
 	} );
 

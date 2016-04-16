@@ -39,7 +39,7 @@ class Custom_Post_Type {
 		$this->json_data = array();
 		$this->screen = null;
 		$this->args = $args;
-		
+
 		foreach ( $fields as $field ) {
 			if ( $field instanceof Custom_Meta_Box ) {
 				$field->set_parent( $this );
@@ -145,7 +145,9 @@ class Custom_Post_Type {
 	 * @return void
 	 */
 	public function register_post_type() {
-		register_post_type( $this->name, $this->args );
+		if ( ! post_type_exists( $this->name ) ) {
+			register_post_type( $this->name, $this->args );
+		}
 	}
 
 	/**

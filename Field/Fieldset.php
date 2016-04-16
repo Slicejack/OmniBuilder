@@ -15,20 +15,18 @@ class Fieldset extends Custom_Field {
 	/**
 	 * @{inheritDoc}
 	 */
-	public function render() {
-		$output = '<script type="text/html" id="tmpl-ob-fieldset">
+	public function render() { ?>
+		<script type="text/html" id="tmpl-ob-fieldset">
 			<# if ( data.label ) { #><h4 class="title">{{ data.label }}</h4<# } #>
 			<div class="description">{{ data.description }}</div>
 			<div class="fields"></div>
-		</script>';
+		</script>
 
-		foreach ( $this->children as $child ) {
+		<?php foreach ( $this->children as $child ) {
 			if ( $child instanceof Custom_Field ) {
-				$output .= $child->render();
+				$child->render();
 			}
 		}
-
-		return $output;
 	}
 
 	/**
@@ -71,5 +69,5 @@ class Fieldset extends Custom_Field {
 		wp_enqueue_script( 'ob-fieldset', OMNI_BUILDER_URI . '/Resources/js/Field/Fieldset.js', array( 'ob-field' ), '0.1', true );
 		parent::enqueue_scripts();
 	}
-	
+
 }
